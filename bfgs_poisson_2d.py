@@ -10,6 +10,7 @@ import jax.numpy as jnp
 from jax import random, grad, vmap, jit
 import jaxopt
 from jax.flatten_util import ravel_pytree
+import BFGS_jax
 
 from ngrad.models import init_params, mlp
 from ngrad.domains import Square, SquareBoundary
@@ -79,19 +80,32 @@ def l2_norm(f, integrator):
 flat_params, unravel = ravel_pytree(params)
 flat_loss = lambda x: loss(unravel(x))
 
-BFGS = jaxopt.BFGS(
+BFGS = BFGS_jax.BFGS(
     fun = flat_loss,
     value_and_grad = False,
 )
 state = BFGS.init_state(flat_params)
    
 # BFGS optimization
-for iteration in range(50):
-    grads = grad(loss)(params)
+import time
+n = 1000
+@jax.jit
+def jitted_update(params, flat_params, state):
+    # grads = grad(loss)(params)
     flat_params, state = BFGS.update(flat_params, state)
     params = unravel(flat_params)
+    return params, flat_params, state
+
+
+for iteration in range(n):
+    params, flat_params, state = jitted_update(params, flat_params, state)
     
-    if iteration % 1 == 0:
+    if iteration == 1:
+        start = time.time()
+    if iteration == n-2:
+        elapsed = time.time() - start
+    
+    if iteration == n-2:
         # errors
         l2_error = l2_norm(v_error, eval_integrator)
         h1_error = l2_error + l2_norm(v_error_abs_grad, eval_integrator)
@@ -100,3 +114,4 @@ for iteration in range(50):
             f'BFGS Iteration: {iteration} with loss: {loss(params)} with error '
             f'L2: {l2_error} and error H1: {h1_error}.'
         )
+print("BFGS time per iteration:", (elapsed)/(n - 2), "s/it")

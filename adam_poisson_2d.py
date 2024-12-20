@@ -86,14 +86,26 @@ exponential_decay = optax.exponential_decay(
 optimizer = optax.adam(learning_rate=exponential_decay)
 opt_state = optimizer.init(params)
    
-# adam gradient descent with line search
-for iteration in range(200000):
+@jax.jit
+def jitted_update(params, opt_state):
     grads = grad(loss)(params)
-
     updates, opt_state = optimizer.update(grads, opt_state)
     params = optax.apply_updates(params, updates)
+    return params, opt_state
+
+# adam gradient descent with line search
+import time
+n = 20000
+for iteration in range(n):
     
-    if iteration % 1000 == 0:
+    params, opt_state = jitted_update(params, opt_state)
+
+    if iteration == 1:
+        start = time.time()
+    if iteration == n-2:
+        elapsed = time.time() - start
+    
+    if iteration == n-2:
         # errors
         l2_error = l2_norm(v_error, eval_integrator)
         h1_error = l2_error + l2_norm(v_error_abs_grad, eval_integrator)
@@ -102,3 +114,5 @@ for iteration in range(200000):
             f'Adam Iteration: {iteration} with loss: {loss(params)} with error '
             f'L2: {l2_error} and error H1: {h1_error}.'
         )
+
+print("Adam time per iteration:", (elapsed)/(n - 2), "s/it")

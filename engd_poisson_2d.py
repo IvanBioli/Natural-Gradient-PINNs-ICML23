@@ -100,13 +100,23 @@ v_error_abs_grad = vmap(
 def l2_norm(f, integrator):
     return integrator(lambda x: (f(x))**2)**0.5    
    
-# natural gradient descent with line search
-for iteration in range(51):
+def jitted_update(params):
     grads = grad(loss)(params)
     nat_grads = nat_grad(params, grads)
     params, actual_step = ls_update(params, nat_grads)
+    return params, actual_step
+
+# natural gradient descent with line search
+import time
+n = 100
+for iteration in range(n):
+    params, actual_step = jitted_update(params)
+    if iteration == 1:
+        start = time.time()
+    if iteration == n-2:
+        elapsed = time.time() - start
     
-    if iteration % 5 == 0:
+    if iteration == (n-1):
         # errors
         l2_error = l2_norm(v_error, eval_integrator)
         h1_error = l2_error + l2_norm(v_error_abs_grad, eval_integrator)
@@ -115,3 +125,5 @@ for iteration in range(51):
             f'NG Iteration: {iteration} with loss: {loss(params)} with error '
             f'L2: {l2_error} and error H1: {h1_error} and step: {actual_step}'
         )
+
+print("NG time per iteration:", (elapsed)/(n - 2), "s/it")
